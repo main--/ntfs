@@ -101,10 +101,24 @@ impl Ntfs {
         let mut mft_data_value = mft_data_attribute.value(fs)?;
 
         mft_data_value.seek(fs, SeekFrom::Start(offset))?;
+
         let position = mft_data_value
             .data_position()
-            .value()
-            .ok_or(NtfsError::InvalidFileRecordNumber { file_record_number })?;
+            .value();
+
+        let position = match position {
+            None if offset < mft_data_attribute.value_length() => {
+                // If the file happens to be outside the resident data attribute but is actually inside the claimed range
+                // of the data attribute, we need to load the non-resident MFT data and look for the file there.
+                // note that this will end up recursing back into this method, so a malicious volume may trigger
+                // a stack overflow here by creating unresolvable MFT entries
+                let mft_al_attr = mft.find_attribute(fs, NtfsAttributeType::Data, None)?;
+                let mut mft_al_value = mft_al_attr.to_attribute()?.value(fs)?;
+                mft_al_value.seek(fs, SeekFrom::Start(offset))?;
+                mft_al_value.data_position().value()
+            },
+            x => x,
+        }.ok_or(NtfsError::InvalidFileRecordNumber { file_record_number })?;
 
         NtfsFile::new(self, fs, position, file_record_number)
     }

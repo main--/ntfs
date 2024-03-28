@@ -308,7 +308,7 @@ impl<'n> NtfsFile<'n> {
     /// Returns [`NtfsError::AttributeNotFound`] if no such attribute could be found.
     ///
     /// This function also traverses Attribute Lists to find the attribute.
-    fn find_attribute<'f, T>(
+    pub(crate) fn find_attribute<'f, T>(
         &'f self,
         fs: &mut T,
         ty: NtfsAttributeType,

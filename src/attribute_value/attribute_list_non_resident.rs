@@ -152,6 +152,15 @@ impl<'n, 'f> NtfsAttributeListNonResidentAttributeValue<'n, 'f> {
         let (data, position) = attribute.non_resident_value_data_and_position()?;
         let mut stream_data_runs = NtfsDataRuns::new(self.ntfs, data, position);
 
+        if self.stream_state.stream_position() == 0 {
+            // work around the case where $Mft/$DATA is stored outside $Mft/$ATTRIBUTE_LIST,
+            // so connected_entries is missing the first $DATA, so we need to adjust the stream
+            // position to account for that
+            let lowest_vcn = entry.lowest_vcn();
+            let offset = lowest_vcn.offset(self.ntfs)?.try_into().unwrap();
+            self.stream_state.set_stream_position(offset);
+        }
+
         // Get the first Data Run already here to save time and let `data_position` return something meaningful.
         let stream_data_run = match stream_data_runs.next() {
             Some(stream_data_run) => stream_data_run,
